@@ -34,16 +34,16 @@ public class Nivel3Semaforos {
         private int recaudado = 0;
         private int pagos = 0;
         // TODO 3g: la caja la usan todos los hilos: protégela como monitor
-        void cobrar(int euros) { recaudado += euros; pagos++; }
-        int getRecaudado() { return recaudado; }
-        int getPagos() { return pagos; }
+        synchronized void cobrar(int euros) { recaudado += euros; pagos++; }
+        synchronized  int getRecaudado() { return recaudado; }
+        synchronized int getPagos() { return pagos; }
     }
 
     static final int PLAZAS = 3, COCHES = 8, TARIFA = 2;
     // TODO 3a: crea el semáforo de las plazas: contador, con PLAZAS permisos y JUSTO
-    static Semaphore plazas = null;
+    static Semaphore plazas = new Semaphore(PLAZAS,true);
     // TODO 3b: crea el semáforo del cajero: binario (un solo cajero)
-    static Semaphore cajero = null;
+    static Semaphore cajero = new Semaphore(1);
 
     /** Plazas libres ahora mismo (-1 si el semáforo aún no existe). */
     static int libres() { return plazas == null ? -1 : plazas.availablePermits(); }
@@ -61,24 +61,37 @@ public class Nivel3Semaforos {
             Util.log("llega con prisa: espera como mucho 400 ms");
             // TODO 3c: intenta coger plaza esperando como MUCHO 400 ms.
             //          Si no lo consigue: Util.log("se cansa de esperar y se va"); y return;
+            if (!plazas.tryAcquire(400, TimeUnit.MILLISECONDS)) {
+                Util.log("se cansa de esperar y se va");
+                return;
+            }
         } else {
             Util.log("llega a la barrera. Plazas libres: " + libres());
             // TODO 3d: coge una plaza. Si no hay, el coche tiene que esperar aquí
+            plazas.acquire();
         }
         // TODO 3e: desde aquí el coche tiene una plaza y hay que devolverla SIEMPRE,
         //          aunque salte una excepción. Reorganiza este bloque.
-        contarEntrada();
-        Util.log("ENTRA. Plazas libres: " + libres());
-        Util.dormir(Util.azar(200, 500));                       // aparcado
+        try {
+            contarEntrada();
+            Util.log("ENTRA. Plazas libres: " + libres());
+            Util.dormir(Util.azar(200, 500));                       // aparcado
 
-        // TODO 3f: solo hay un cajero: un conductor paga cada vez, y el cajero se libera siempre
-        Util.log("paga " + TARIFA + " € en el cajero");
-        Util.dormir(50);
-        caja.cobrar(TARIFA);
-
-        contarSalida();
-        // (TODO 3e) aquí se devuelve la plaza
-        Util.log("SALE. Plazas libres: " + libres());
+            // TODO 3f: solo hay un cajero: un conductor paga cada vez, y el cajero se libera siempre
+            cajero.acquire();
+            try {
+                Util.log("paga " + TARIFA + " € en el cajero");
+                Util.dormir(50);
+                caja.cobrar(TARIFA);
+            } finally {
+                cajero.release();
+            }
+            contarSalida();
+        } finally {
+            // (TODO 3e) aquí se devuelve la plaza
+            plazas.release();
+            Util.log("SALE. Plazas libres: " + libres());
+        }
     }
 
     public static void main(String[] args) throws InterruptedException {
