@@ -36,26 +36,31 @@ public class Nivel4Monitor {
         }
 
         /** Espera hasta que haya una plaza libre y la ocupa. Devuelve las plazas que quedan. */
-        int entrar() throws InterruptedException {
+        synchronized int entrar() throws InterruptedException {
             // TODO 4a: mientras no haya plazas libres, el coche espera.
             //          Antes de cada espera escribe: Util.log("espera: parking lleno");
+            while (libres == 0) {
+                Util.log("espera: parking lleno");
+                wait();
+            }
             libres--;
             maxDentro = Math.max(maxDentro, capacidad - libres);
             return libres;
         }
 
         /** Libera la plaza, cobra y avisa a los que esperan. Devuelve las plazas libres. */
-        int salir(int euros) {
+        synchronized int salir(int euros) {
             recaudado += euros;
             libres++;
             // TODO 4b: avisa a los coches que esperan plaza
+            notifyAll();
             return libres;
         }
 
-        // TODO 4c: un monitor protege TODO su estado. Revisa todos los métodos de esta clase.
-        int getLibres() { return libres; }
-        int getMaxDentro() { return maxDentro; }
-        int getRecaudado() { return recaudado; }
+       // TODO 4c: un monitor protege TODO su estado. Revisa todos los métodos de esta clase.
+       synchronized int getLibres() { return libres; }
+        synchronized int getMaxDentro() { return maxDentro; }
+        synchronized int getRecaudado() { return recaudado; }
     }
 
     public static void main(String[] args) throws InterruptedException {
